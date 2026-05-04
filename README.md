@@ -29,6 +29,8 @@ To build an autonomous mapping platform capable of generating 3D floor plans usi
 *   **Software:** C++ (Firmware), Java/Processing (Visualization).
 
 
+<img width="1196" height="696" alt="image" src="https://github.com/user-attachments/assets/dc0c6997-dab2-4256-b368-af8ed4afe3da" />
+
 ### TO DO:
 - Bill of materials to be addes (BOM)
 - pictures to be added 
