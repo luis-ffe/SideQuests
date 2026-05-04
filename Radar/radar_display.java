@@ -1,17 +1,25 @@
-// this file extension should be .pde to use in the processing app
-// 
+// Save this file with a .pde extension and run it in Processing
 
 import processing.serial.*; 
+
+int boudRate = 9600;
 
 Serial myPort; 
 String data = "";
 float virtualAngle = 0; 
-float sweepSpeed = 1.2;
+
+//SPEED
+float sweepSpeed = 0.5; 
 int direction = 1; 
 
 float[] blipX = new float[181]; 
 float[] blipY = new float[181];
 float[] blipOpacity = new float[181];
+
+// HUD Vars
+int lastDetectedDist = 0;
+int lastDetectedAngle = 0;
+float displayDist = 0;
 
 void setup() {
   size(1200, 700); 
@@ -23,22 +31,37 @@ void setup() {
   }
 
   String[] ports = Serial.list();
+  println("Available Serial Ports:");
+  printArray(ports);
+  
   String arduinoPort = "";
-  for (String p : ports) {
-    if (p.contains("usbmodem") || p.contains("usbserial")) {
-      arduinoPort = p;
+  
+  // OS Redundancy (macOS != WindowsOS) Ports
+  if (ports.length > 0) {
+    for (String p : ports) {
+      if (p.contains("usbmodem") || p.contains("usbserial") || p.contains("COM")) {
+        arduinoPort = p;
+      }
     }
-  }
+    
+    if (arduinoPort.equals("")) {
+      arduinoPort = ports[ports.length - 1];
+    }
 
-  if (!arduinoPort.equals("")) {
-    myPort = new Serial(this, arduinoPort, 9600);
-    myPort.bufferUntil('.'); 
+    try {
+      myPort = new Serial(this, arduinoPort, 9600);
+      myPort.bufferUntil('.'); 
+      println("Connected to: " + arduinoPort);
+    } catch (Exception e) {
+      println("Error.");
+    }
+  } else {
+    println("NO PORTS FOUND");
   }
 }
 
 void draw() {
-  // fade
-  fill(0, 30); 
+  fill(0, 15); 
   noStroke();
   rect(0, 0, width, height);
   
@@ -48,45 +71,59 @@ void draw() {
   }
   
   drawRadarGrid();          
-  drawBlips();     
   drawSweepLine(virtualAngle); 
+  drawBlips();     
+  drawHUD();
 }
 
 void serialEvent (Serial myPort) { 
   try {
     data = myPort.readStringUntil('.');
     if (data != null) {
-      data = data.substring(0, data.length()-1);
+      data = data.substring(0, data.length()-1); 
       String[] list = split(data, ',');
+      
       if (list.length == 2) {
         int dist = int(list[1]);
         
-        // DETECTION TRIGGER
-        if(dist < 40 && dist > 2) {
-
+        if(dist <= 40 && dist > 2) {
+          lastDetectedDist = dist;
+          lastDetectedAngle = int(virtualAngle);
           float rad = radians(virtualAngle + 180);
-          float pixsDistance = dist * 15; 
           
+          // 40cm max distance * 15 scale = 600 pixels
+          float pixsDistance = dist * 15; 
           int slot = int(virtualAngle);
-          blipX[slot] = pixsDistance * cos(rad);
-          blipY[slot] = pixsDistance * sin(rad);
-          blipOpacity[slot] = 255;
+          
+          if (slot >= 0 && slot <= 180) {
+            blipX[slot] = pixsDistance * cos(rad);
+            blipY[slot] = pixsDistance * sin(rad);
+            blipOpacity[slot] = 255; 
+          }
         }
       }
     }
-  } catch (Exception e) {}
+  } catch (Exception e) {
+  }
 }
 
 void drawBlips() {
   pushMatrix();
   translate(width/2, height - 50); 
+  
   for (int i = 0; i <= 180; i++) {
     if (blipOpacity[i] > 0) {
-      strokeWeight(10);
-      stroke(255, 0, 0, blipOpacity[i]);
+      strokeWeight(15);
+      stroke(255, 0, 0, blipOpacity[i] * 0.3); 
       point(blipX[i], blipY[i]);
       
-      blipOpacity[i] -= 0.5; 
+      strokeWeight(6);
+      stroke(255, 50, 50, blipOpacity[i]); 
+      point(blipX[i], blipY[i]);
+      
+      // dot detection fading velocity increase the value to disapear faster
+      // would be better if the detection only disapears when the sweeping goes over the smae angle and there is no longer any obstacle there.
+      blipOpacity[i] -= 2.5; 
     }
   }
   popMatrix();
@@ -97,9 +134,18 @@ void drawRadarGrid() {
   translate(width/2, height - 50); 
   noFill();
   strokeWeight(2);
-  stroke(0, 200, 0, 60); 
-  for (int r=200; r<=800; r+=200) {
+  stroke(0, 150, 0, 80); 
+  
+  //SIZE 
+  for (int r=200; r<=1200; r+=200) {
     arc(0, 0, r, r, PI, TWO_PI);
+  }
+
+  strokeWeight(1);
+  stroke(0, 150, 0, 60);
+  for (int angle = 30; angle < 180; angle += 30) {
+    float rad = radians(angle + 180);
+    line(0, 0, 600 * cos(rad), 600 * sin(rad));
   }
   popMatrix();
 }
@@ -107,16 +153,26 @@ void drawRadarGrid() {
 void drawSweepLine(float angle) {
   pushMatrix();
   translate(width/2, height - 50); 
-  
   float rad = radians(angle + 180);
-
-  strokeWeight(20);
-  stroke(0, 255, 0, 30);
-  line(0, 0, (width*0.45)*cos(rad), (width*0.45)*sin(rad));
-  
-  strokeWeight(4);
-  stroke(0, 255, 0); 
-  line(0, 0, (width*0.45)*cos(rad), (width*0.45)*sin(rad)); 
-  
+  strokeWeight(25);
+  stroke(0, 255, 0, 15);
+  line(0, 0, 600 * cos(rad), 600 * sin(rad));
+  strokeWeight(3);
+  stroke(0, 255, 0, 200); 
+  line(0, 0, 600 * cos(rad), 600 * sin(rad)); 
   popMatrix();
+}
+
+void drawHUD() {
+  displayDist = lerp(displayDist, lastDetectedDist, 0.08);
+  
+  fill(0, 255, 0);
+  textSize(20);
+  textAlign(LEFT);
+  text("RADAR SYSTEM ONLINE", 30, 40);
+  textSize(16);
+  fill(0, 200, 0);
+  text("SWEEP ANGLE: " + int(virtualAngle) + "°", 30, 70);
+  text("TARGET RANGE: " + (lastDetectedDist > 0 ? int(displayDist) + " cm" : "SCANNING..."), 30, 95);
+  text("TARGET BEARING: " + (lastDetectedDist > 0 ? lastDetectedAngle + "°" : "---"), 30, 120);
 }
