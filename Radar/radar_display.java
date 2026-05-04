@@ -1,8 +1,7 @@
 // Save this file with a .pde extension and run it in Processing
+// ADJUST BAUD RATE in LINE 50 +-
 
 import processing.serial.*; 
-
-int boudRate = 9600;
 
 Serial myPort; 
 String data = "";
@@ -47,7 +46,7 @@ void setup() {
     if (arduinoPort.equals("")) {
       arduinoPort = ports[ports.length - 1];
     }
-
+// ADJUST BAUD RATE HERE
     try {
       myPort = new Serial(this, arduinoPort, 9600);
       myPort.bufferUntil('.'); 
